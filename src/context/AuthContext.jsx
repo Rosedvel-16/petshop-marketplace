@@ -95,7 +95,7 @@ export const AuthProvider = ({ children }) => {
   
   const sendPasswordResetEmail = async (email) => {
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: 'http://localhost:5173/reset-password', // A dónde redirigir
+      redirectTo: 'https://petshop-marketplace.vercel.app/reset-password', // A dónde redirigir
     })
     if (error) throw error
   }
