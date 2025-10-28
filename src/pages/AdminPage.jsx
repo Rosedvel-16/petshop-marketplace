@@ -2,19 +2,16 @@ import React, { useState, useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import { supabase } from '../lib/supabaseClient'
 
-// Un componente separado para el formulario de productos
+// --- ProductForm (Sin cambios, tu código estaba bien) ---
 const ProductForm = ({ categories, onFormSubmit, loading }) => {
   const { register, handleSubmit, reset, formState: { errors } } = useForm()
-
   const onSubmit = async (data) => {
     await onFormSubmit(data, 'products', reset)
   }
-
   return (
     <div className="admin-form-container">
       <h3>Añadir Nuevo Producto</h3>
       <form onSubmit={handleSubmit(onSubmit)} className="admin-form">
-        {/* ... (campos de producto, sin cambios) ... */}
         <div className="form-group">
           <label>Nombre del Producto</label>
           <input {...register('name', { required: 'El nombre es obligatorio' })} />
@@ -59,13 +56,14 @@ const ProductForm = ({ categories, onFormSubmit, loading }) => {
   )
 }
 
-// NUEVO: Componente para el formulario de mascotas
+// --- PetForm (Con 1 corrección importante) ---
 const PetForm = ({ categories, onFormSubmit, loading }) => {
   const { register, handleSubmit, reset, formState: { errors } } = useForm()
 
   const onSubmit = async (data) => {
-    // Convierte 'age' a número
-    const formData = { ...data, age: parseInt(data.age, 10) }
+    // CORRECCIÓN: Si la edad está vacía, envía 'null' a la DB, no NaN.
+    const age = data.age === '' || data.age === null ? null : parseInt(data.age, 10)
+    const formData = { ...data, age: age }
     await onFormSubmit(formData, 'pets', reset)
   }
 
@@ -73,6 +71,7 @@ const PetForm = ({ categories, onFormSubmit, loading }) => {
     <div className="admin-form-container">
       <h3>Añadir Mascota en Adopción</h3>
       <form onSubmit={handleSubmit(onSubmit)} className="admin-form">
+        {/* ... (resto del formulario de PetForm sin cambios) ... */}
         <div className="form-group">
           <label>Nombre de la Mascota</label>
           <input {...register('name', { required: 'El nombre es obligatorio' })} />
@@ -94,6 +93,7 @@ const PetForm = ({ categories, onFormSubmit, loading }) => {
           </div>
           <div className="form-group">
             <label>Edad (años)</label>
+            {/* El 'valueAsNumber' aquí causaba el problema de NaN, lo quitamos y lo manejamos en onSubmit */}
             <input type="number" min="0" {...register('age')} />
           </div>
           <div className="form-group">
@@ -132,23 +132,21 @@ const PetForm = ({ categories, onFormSubmit, loading }) => {
   )
 }
 
-// --- Componente Principal de la Página de Admin ---
+// --- Componente Principal (Con 1 corrección importante) ---
 const AdminPage = () => {
   const [productCategories, setProductCategories] = useState([])
-  const [petCategories, setPetCategories] = useState([]) // NUEVO
+  const [petCategories, setPetCategories] = useState([])
   const [loading, setLoading] = useState(false)
   const [formMessage, setFormMessage] = useState({ type: '', text: '' })
 
-  // Cargar AMBOS tipos de categorías
+  // Cargar categorías (Sin cambios)
   useEffect(() => {
     const fetchCategories = async () => {
-      // Cargar categorías de productos
       const { data: productCats } = await supabase
         .from('product_categories')
         .select('id, name')
       if (productCats) setProductCategories(productCats)
       
-      // Cargar categorías de mascotas
       const { data: petCats } = await supabase
         .from('pet_categories')
         .select('id, name')
@@ -157,21 +155,30 @@ const AdminPage = () => {
     fetchCategories()
   }, [])
 
-  // Función genérica para manejar el envío de CUALQUIER formulario
+  // --- CORRECCIÓN: 'handleFormSubmit' con captura de errores mejorada ---
   const handleFormSubmit = async (data, tableName, resetForm) => {
     try {
       setLoading(true)
       setFormMessage({ type: '', text: '' })
 
+      // 'data' es el objeto del formulario (ej. { name: 'Rascador', price: 12, ... })
       const { error } = await supabase.from(tableName).insert(data)
       
-      if (error) throw error
+      if (error) {
+        // Si Supabase devuelve un error, lo lanzamos para que el CATCH lo atrape
+        throw error
+      }
 
       setFormMessage({ type: 'success', text: `¡${tableName === 'products' ? 'Producto' : 'Mascota'} añadido exitosamente!` })
-      resetForm() // Limpia el formulario específico
-    } catch (error) {
+      resetForm() // Limpia el formulario
+      
+    } catch (error) { // El 'catch' ahora SÍ atrapará el error
+      console.error("Error al insertar en Supabase:", error)
+      // Mostramos el mensaje de error real de la base de datos
       setFormMessage({ type: 'error', text: `Error: ${error.message}` })
+      
     } finally {
+      // El 'finally' se ejecutará SIEMPRE, liberando el botón
       setLoading(false)
     }
   }
@@ -180,7 +187,7 @@ const AdminPage = () => {
     <div className="page-content">
       <h2>Panel de Administración</h2>
       
-      {/* Mensaje de éxito/error (ahora es compartido) */}
+      {/* ¡AHORA DEBERÍA MOSTRARSE EL ERROR AQUÍ! */}
       {formMessage.text && (
         <div className={`form-message ${formMessage.type}`}>
           {formMessage.text}
